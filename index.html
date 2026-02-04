@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Library Registration & Attendance System</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Using a different QR code library that's more reliable -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <!-- QR Code Generation Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-svg@1.1.0/lib/qrcode.min.js"></script>
+    <!-- Excel Export Library -->
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <!-- jsQR for scanning -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         * {
@@ -145,29 +148,36 @@
             transform: translateY(-2px);
         }
 
-        #generateBtn {
+        .btn-success {
             background-color: #27ae60;
         }
 
-        #generateBtn:hover {
+        .btn-success:hover {
             background-color: #219653;
         }
 
-        #scanBtn {
+        .btn-danger {
             background-color: #e74c3c;
         }
 
-        #scanBtn:hover {
+        .btn-danger:hover {
             background-color: #c0392b;
         }
 
-        #stopBtn {
+        .btn-warning {
             background-color: #f39c12;
-            display: none;
         }
 
-        #stopBtn:hover {
+        .btn-warning:hover {
             background-color: #d68910;
+        }
+
+        .btn-excel {
+            background-color: #2ecc71;
+        }
+
+        .btn-excel:hover {
+            background-color: #27ae60;
         }
 
         .qr-container {
@@ -181,6 +191,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            background-color: #f8f9fa;
         }
 
         #qrcode {
@@ -191,12 +202,12 @@
             justify-content: center;
             align-items: center;
             background-color: white;
-            padding: 10px;
+            padding: 15px;
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
-        #qrcode img {
+        #qrcode img, #qrcode svg {
             max-width: 100%;
             height: auto;
         }
@@ -258,13 +269,13 @@
             display: block;
         }
 
-        .scanner-buttons {
+        .button-group {
             display: flex;
             gap: 10px;
             margin-top: 10px;
         }
 
-        .scanner-buttons button {
+        .button-group button {
             width: auto;
             flex: 1;
         }
@@ -272,6 +283,16 @@
         .logs-container {
             grid-column: 1 / -1;
             margin-top: 20px;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .export-buttons button {
+            flex: 1;
         }
 
         table {
@@ -348,6 +369,10 @@
             background-color: #e74c3c;
         }
 
+        .notification.warning {
+            background-color: #f39c12;
+        }
+
         .user-info {
             background-color: #f8f9fa;
             padding: 15px;
@@ -365,13 +390,13 @@
             color: #2c3e50;
         }
 
-        .demo-qr-buttons {
+        .demo-buttons {
             display: flex;
             gap: 10px;
             margin-top: 15px;
         }
 
-        .demo-qr-buttons button {
+        .demo-buttons button {
             flex: 1;
             padding: 10px;
             font-size: 0.9rem;
@@ -392,6 +417,9 @@
             .mobile-warning {
                 display: block;
             }
+            .button-group, .export-buttons, .demo-buttons {
+                flex-direction: column;
+            }
         }
 
         .qr-fallback {
@@ -407,13 +435,45 @@
         .qr-fallback.active {
             display: block;
         }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 2rem;
+            color: #3498db;
+            margin-bottom: 5px;
+        }
+
+        .stat-card p {
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .stats-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
     </style>
 </head>
 <body>
     <header>
         <div class="container">
             <h1><i class="fas fa-book-reader"></i> Library Registration & Attendance System</h1>
-            <p>Register library users with QR codes and track attendance with time in/out scanning</p>
+            <p>Register library users with QR codes, track attendance, and export to Excel</p>
         </div>
     </header>
 
@@ -423,7 +483,27 @@
         </div>
         
         <div class="app-description">
-            <p>This system allows library administrators to register users with a unique ID and generate QR codes for each user. Users can then scan their QR code to record time in and time out from the library.</p>
+            <p>Register library users with unique IDs, generate QR codes for each user, track time in/out by scanning QR codes, and export all data to Excel automatically.</p>
+        </div>
+
+        <!-- Statistics -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <h3 id="totalUsers">0</h3>
+                <p><i class="fas fa-users"></i> Total Users</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="currentInLibrary">0</h3>
+                <p><i class="fas fa-user-check"></i> Currently In Library</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="totalLogs">0</h3>
+                <p><i class="fas fa-history"></i> Attendance Logs</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="todaysVisits">0</h3>
+                <p><i class="fas fa-calendar-day"></i> Today's Visits</p>
+            </div>
         </div>
 
         <div class="main-content">
@@ -438,11 +518,11 @@
                     <label for="libraryId">Library ID</label>
                     <input type="text" id="libraryId" placeholder="Enter unique library ID">
                 </div>
-                <button id="generateBtn">
+                <button id="generateBtn" class="btn-success">
                     <i class="fas fa-qrcode"></i> Generate Library QR Code
                 </button>
                 
-                <div class="demo-qr-buttons">
+                <div class="demo-buttons">
                     <button id="demoUser1" style="background-color: #9b59b6;">
                         <i class="fas fa-user"></i> Demo User 1
                     </button>
@@ -455,22 +535,19 @@
                     <h4>User Information</h4>
                     <p><strong>Name:</strong> <span id="infoName"></span></p>
                     <p><strong>Library ID:</strong> <span id="infoId"></span></p>
-                    <p><strong>QR Code Data:</strong> <span id="qrData"></span></p>
+                    <p><strong>QR Data:</strong> <span id="qrData" style="font-family: monospace; font-size: 12px;"></span></p>
                 </div>
                 
                 <div class="qr-container">
                     <h3>Library ID QR Code</h3>
-                    <p>Scan this code to record time in/out at the library entrance</p>
+                    <p>Scan this code to record time in/out at library entrance</p>
                     <div id="qrcode"></div>
                     <div class="qr-fallback" id="qrFallback">
-                        <p><strong>Manual QR Code Data:</strong></p>
+                        <p><strong>QR Code Data:</strong></p>
                         <p id="qrFallbackData" style="font-family: monospace; word-break: break-all; font-size: 12px; background: white; padding: 10px; border-radius: 5px;"></p>
-                        <p style="margin-top: 10px; font-size: 14px; color: #666;">
-                            <i class="fas fa-lightbulb"></i> Use this data with any QR code generator app
-                        </p>
                     </div>
-                    <p id="qrInstructions" style="display: none; margin-top: 10px;">
-                        <i class="fas fa-info-circle"></i> Save or print this QR code for library access
+                    <p id="qrInstructions" style="display: none; margin-top: 10px; color: #27ae60;">
+                        <i class="fas fa-check-circle"></i> QR Code generated successfully!
                     </p>
                 </div>
             </div>
@@ -484,19 +561,18 @@
                             <i class="fas fa-camera fa-2x"></i>
                             <p>Click "Start Scanner" to begin scanning QR codes</p>
                             <p style="font-size: 0.9rem; margin-top: 10px; opacity: 0.9;">
-                                <i class="fas fa-lightbulb"></i> Point camera at a QR code
+                                <i class="fas fa-lightbulb"></i> Point camera at QR code
                             </p>
                         </div>
                     </div>
                     <div class="scanner-frame" id="scannerFrame"></div>
-                    <!-- Video element for scanner will be added here -->
                 </div>
                 
-                <div class="scanner-buttons">
-                    <button id="scanBtn">
+                <div class="button-group">
+                    <button id="scanBtn" class="btn-danger">
                         <i class="fas fa-play"></i> Start Scanner
                     </button>
-                    <button id="stopBtn">
+                    <button id="stopBtn" class="btn-warning" style="display: none;">
                         <i class="fas fa-stop"></i> Stop Scanner
                     </button>
                 </div>
@@ -510,17 +586,32 @@
                 </div>
             </div>
 
-            <!-- Attendance Logs -->
+            <!-- Attendance Logs & Export -->
             <div class="card logs-container">
-                <h2 class="card-title"><i class="fas fa-history"></i> Attendance Logs</h2>
+                <h2 class="card-title"><i class="fas fa-history"></i> Attendance Logs & Export</h2>
+                
+                <div class="export-buttons">
+                    <button id="exportExcelBtn" class="btn-excel">
+                        <i class="fas fa-file-excel"></i> Export to Excel
+                    </button>
+                    <button id="exportUsersBtn" style="background-color: #9b59b6;">
+                        <i class="fas fa-users"></i> Export Users List
+                    </button>
+                    <button id="clearDataBtn" style="background-color: #e74c3c;">
+                        <i class="fas fa-trash"></i> Clear All Data
+                    </button>
+                </div>
+                
                 <div id="attendanceLogs">
                     <table id="logsTable">
                         <thead>
                             <tr>
+                                <th>No.</th>
                                 <th>Library ID</th>
                                 <th>Name</th>
                                 <th>Time In</th>
                                 <th>Time Out</th>
+                                <th>Duration</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
@@ -539,9 +630,9 @@
 
     <footer>
         <div class="container">
-            <p>Library Registration & Attendance System &copy; 2023 | QR Code Based Solution</p>
+            <p>Library Registration & Attendance System &copy; 2023 | QR Code & Excel Export</p>
             <p style="font-size: 0.9rem; margin-top: 5px;">
-                <i class="fas fa-lightbulb"></i> For mobile: Use HTTPS and allow camera permissions
+                <i class="fas fa-lightbulb"></i> Data is stored in browser. Export to Excel to save permanently.
             </p>
         </div>
     </footer>
@@ -552,67 +643,13 @@
 
     <script>
         // Library data and state
-        const libraryUsers = [];
-        const attendanceLogs = [];
+        const libraryUsers = JSON.parse(localStorage.getItem('libraryUsers')) || [];
+        const attendanceLogs = JSON.parse(localStorage.getItem('attendanceLogs')) || [];
         let scannerActive = false;
         let currentStream = null;
         let scanningInterval = null;
-        let canvas = null;
-        let canvasContext = null;
 
         // DOM elements
         const nameInput = document.getElementById('name');
         const libraryIdInput = document.getElementById('libraryId');
-        const generateBtn = document.getElementById('generateBtn');
-        const scanBtn = document.getElementById('scanBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const demoUser1Btn = document.getElementById('demoUser1');
-        const demoUser2Btn = document.getElementById('demoUser2');
-        const qrcodeDiv = document.getElementById('qrcode');
-        const qrFallback = document.getElementById('qrFallback');
-        const qrFallbackData = document.getElementById('qrFallbackData');
-        const scannerContainer = document.getElementById('scannerContainer');
-        const scannerOverlay = document.getElementById('scannerOverlay');
-        const scannerFrame = document.getElementById('scannerFrame');
-        const logsTableBody = document.getElementById('logsTableBody');
-        const emptyLogsMessage = document.getElementById('emptyLogsMessage');
-        const notification = document.getElementById('notification');
-        const notificationText = document.getElementById('notificationText');
-        const userInfo = document.getElementById('userInfo');
-        const infoName = document.getElementById('infoName');
-        const infoId = document.getElementById('infoId');
-        const qrDataSpan = document.getElementById('qrData');
-        const scannedUserInfo = document.getElementById('scannedUserInfo');
-        const scannedName = document.getElementById('scannedName');
-        const scannedId = document.getElementById('scannedId');
-        const scannedStatus = document.getElementById('scannedStatus');
-        const scannedTime = document.getElementById('scannedTime');
-
-        // Initialize QRCode generator
-        let qrcodeGenerator = null;
-
-        // Event listeners
-        generateBtn.addEventListener('click', generateQRCode);
-        scanBtn.addEventListener('click', startScanner);
-        stopBtn.addEventListener('click', stopScanner);
-        demoUser1Btn.addEventListener('click', () => createDemoUser("John Doe", "LIB1001"));
-        demoUser2Btn.addEventListener('click', () => createDemoUser("Jane Smith", "LIB1002"));
-
-        // Generate QR code function - FIXED VERSION
-        function generateQRCode() {
-            const name = nameInput.value.trim();
-            const libraryId = libraryIdInput.value.trim();
-            
-            if (!name || !libraryId) {
-                showNotification('Please enter both name and library ID', true);
-                return;
-            }
-            
-            // Check if library ID already exists
-            if (libraryUsers.some(user => user.libraryId === libraryId)) {
-                showNotification('Library ID already exists. Please use a different ID.', true);
-                return;
-            }
-            
-            // Create user object
-          
+        const generateBtn = document.getEle
