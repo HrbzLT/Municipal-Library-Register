@@ -119,6 +119,14 @@
             background: #27ae60;
         }
         
+        .btn-info {
+            background: #3498db;
+        }
+        
+        .btn-info:hover {
+            background: #2980b9;
+        }
+        
         .qr-display {
             text-align: center;
             margin: 20px 0;
@@ -256,6 +264,7 @@
         
         .button-group button {
             margin: 0;
+            flex: 1;
         }
         
         .stats {
@@ -283,6 +292,68 @@
         .stat-label {
             color: #7f8c8d;
             font-size: 14px;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .action-buttons button {
+            padding: 5px 10px;
+            font-size: 12px;
+            margin: 0;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1001;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal h3 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        
+        .close-modal {
+            float: right;
+            cursor: pointer;
+            font-size: 24px;
+            color: #999;
+        }
+        
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .users-table th, .users-table td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }
+        
+        .users-table th {
+            background: #f8f9fa;
         }
     </style>
 </head>
@@ -325,6 +396,7 @@
                     <input type="text" id="userId" placeholder="Enter library ID">
                 </div>
                 <button onclick="registerUser()">✅ Generate QR Code</button>
+                <button class="btn-info" onclick="openUserList()">📋 View/Edit Users</button>
                 
                 <div class="button-group">
                     <button class="btn-warning" onclick="createDemoUser('John Doe', 'LIB001')">Demo User 1</button>
@@ -366,7 +438,7 @@
                 
                 <div class="button-group">
                     <button onclick="startScanner()">▶️ Start Scanner</button>
-                    <button class="btn-danger" onclick="stopScanner()" style="display: none;">⏹️ Stop Scanner</button>
+                    <button class="btn-danger" onclick="stopScanner()" id="stopScannerBtn" style="display: none;">⏹️ Stop Scanner</button>
                 </div>
                 
                 <div class="user-info" id="scanResult">
@@ -385,6 +457,7 @@
                 <div class="button-group">
                     <button class="btn-excel" onclick="exportToExcel()">📥 Export to Excel</button>
                     <button class="btn-warning" onclick="exportUsersExcel()">👥 Export Users</button>
+                    <button class="btn-info" onclick="openUserList()">✏️ Edit Users</button>
                     <button class="btn-danger" onclick="clearData()">🗑️ Clear Data</button>
                 </div>
                 
@@ -412,6 +485,48 @@
         </div>
     </div>
     
+    <!-- User List Modal -->
+    <div class="modal" id="userListModal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeUserList()">&times;</span>
+            <h3>📋 Registered Users</h3>
+            <div style="margin-bottom: 15px;">
+                <input type="text" id="searchUser" placeholder="Search users..." onkeyup="searchUsers()" style="width: 100%; padding: 10px;">
+            </div>
+            <table class="users-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                    <!-- Users will be populated here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Edit User Modal -->
+    <div class="modal" id="editUserModal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeEditUser()">&times;</span>
+            <h3>✏️ Edit User</h3>
+            <div class="form-group">
+                <label for="editUserName">Full Name</label>
+                <input type="text" id="editUserName" placeholder="Enter full name">
+            </div>
+            <div class="form-group">
+                <label for="editUserId">Library ID</label>
+                <input type="text" id="editUserId" placeholder="Enter library ID" readonly>
+            </div>
+            <button onclick="saveUserChanges()">💾 Save Changes</button>
+            <button class="btn-danger" onclick="deleteUser()">🗑️ Delete User</button>
+        </div>
+    </div>
+    
     <div class="notification" id="notification">
         <span id="notificationText">System ready!</span>
     </div>
@@ -427,6 +542,15 @@
         let logs = JSON.parse(localStorage.getItem('attendanceLogs')) || [];
         let scannerActive = false;
         let videoStream = null;
+        let scanInterval = null;
+        let currentUserToEdit = null;
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStats();
+            updateLogsTable();
+            showNotification('System loaded successfully!');
+        });
         
         // Show notification
         function showNotification(message, isError = false) {
@@ -440,6 +564,12 @@
             setTimeout(() => {
                 notification.style.display = 'none';
             }, 3000);
+        }
+        
+        // Save data to localStorage
+        function saveData() {
+            localStorage.setItem('libraryUsers', JSON.stringify(users));
+            localStorage.setItem('attendanceLogs', JSON.stringify(logs));
         }
         
         // Update statistics
@@ -503,16 +633,15 @@
             updateStats();
         }
         
-        // Generate QR Code - SIMPLE METHOD
+        // Generate QR Code
         function generateQRCode(name, id) {
             const qrData = JSON.stringify({ name: name, id: id });
             document.getElementById('displayQRData').textContent = qrData;
             
             const qrDiv = document.getElementById('qrcode');
-            qrDiv.innerHTML = ''; // Clear previous
+            qrDiv.innerHTML = '';
             
             try {
-                // Try using QRCode library
                 QRCode.toCanvas(qrDiv, qrData, {
                     width: 180,
                     height: 180,
@@ -523,7 +652,6 @@
                     }
                 }, function(error) {
                     if (error) {
-                        // Fallback: Show data instead
                         qrDiv.innerHTML = `
                             <div style="text-align: center; padding: 20px;">
                                 <div style="font-size: 40px; color: #666; margin-bottom: 10px;">📋</div>
@@ -533,7 +661,6 @@
                             </div>
                         `;
                         
-                        // Also show QR data
                         document.getElementById('qrDataText').textContent = qrData;
                         document.getElementById('qrFallback').style.display = 'block';
                     } else {
@@ -541,7 +668,6 @@
                     }
                 });
             } catch (e) {
-                // Ultimate fallback
                 qrDiv.innerHTML = `
                     <div style="text-align: center; padding: 20px;">
                         <div style="font-size: 40px; color: #666; margin-bottom: 10px;">👤</div>
@@ -570,19 +696,405 @@
             
             const video = document.getElementById('scannerVideo');
             const overlay = document.getElementById('scannerOverlay');
-            const startBtn = document.querySelector('button[onclick="startScanner()"]');
-            const stopBtn = document.querySelector('button[onclick="stopScanner()"]');
             
             try {
-                // Get camera access
                 videoStream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment' }
                 });
                 
                 video.srcObject = videoStream;
-                video.play();
+                await video.play();
                 overlay.style.display = 'none';
                 scannerActive = true;
                 
-                startBtn.style.display = 'none';
+                document.querySelector('button[onclick="startScanner()"]').style.display = 'none';
+                document.getElementById('stopScannerBtn').style.display = 'block';
+                
+                // Start scanning loop
+                scanInterval = setInterval(scanQRCode, 500);
+                showNotification('Scanner started!');
+                
+            } catch (error) {
+                showNotification('Failed to access camera: ' + error.message, true);
+            }
+        }
         
+        // Stop scanner
+        function stopScanner() {
+            if (!scannerActive) return;
+            
+            const video = document.getElementById('scannerVideo');
+            const overlay = document.getElementById('scannerOverlay');
+            
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            
+            if (scanInterval) {
+                clearInterval(scanInterval);
+                scanInterval = null;
+            }
+            
+            video.srcObject = null;
+            overlay.style.display = 'flex';
+            scannerActive = false;
+            
+            document.querySelector('button[onclick="startScanner()"]').style.display = 'block';
+            document.getElementById('stopScannerBtn').style.display = 'none';
+            
+            showNotification('Scanner stopped');
+        }
+        
+        // Scan QR Code
+        function scanQRCode() {
+            const video = document.getElementById('scannerVideo');
+            const canvas = document.getElementById('scannerCanvas');
+            const context = canvas.getContext('2d');
+            
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // Simple QR code detection (simulated)
+                // In a real app, you would use a proper QR code library
+                simulateQRDetection();
+            }
+        }
+        
+        // Simulate QR detection (for demo)
+        function simulateQRDetection() {
+            // Randomly detect a QR code for demo purposes
+            if (Math.random() > 0.9 && users.length > 0) {
+                const randomUser = users[Math.floor(Math.random() * users.length)];
+                processScan(randomUser);
+            }
+        }
+        
+        // Process scanned QR code
+        function processScan(user) {
+            const now = new Date();
+            const userIndex = users.findIndex(u => u.id === user.id);
+            
+            if (userIndex === -1) {
+                showNotification('User not found!', true);
+                return;
+            }
+            
+            const scanResult = document.getElementById('scanResult');
+            const isCheckIn = !users[userIndex].isInLibrary;
+            
+            // Update user status
+            users[userIndex].isInLibrary = isCheckIn;
+            if (isCheckIn) {
+                users[userIndex].lastCheckIn = now.toISOString();
+            } else {
+                users[userIndex].lastCheckOut = now.toISOString();
+            }
+            
+            // Create log entry
+            const logEntry = {
+                id: user.id,
+                name: user.name,
+                timeIn: isCheckIn ? now.toISOString() : users[userIndex].lastCheckIn,
+                timeOut: isCheckIn ? null : now.toISOString(),
+                status: isCheckIn ? 'IN' : 'OUT'
+            };
+            
+            logs.unshift(logEntry);
+            
+            // Update display
+            document.getElementById('scannedUser').textContent = user.name;
+            document.getElementById('scannedId').textContent = user.id;
+            document.getElementById('scannedStatus').textContent = isCheckIn ? 'Checked IN' : 'Checked OUT';
+            document.getElementById('scannedStatus').className = isCheckIn ? 'status-in' : 'status-out';
+            document.getElementById('scannedTime').textContent = now.toLocaleTimeString();
+            scanResult.classList.add('show');
+            
+            // Save data and update UI
+            saveData();
+            updateStats();
+            updateLogsTable();
+            
+            showNotification(`${user.name} ${isCheckIn ? 'checked in' : 'checked out'} successfully!`);
+        }
+        
+        // Update logs table
+        function updateLogsTable() {
+            const logsBody = document.getElementById('logsBody');
+            
+            if (logs.length === 0) {
+                logsBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 30px; color: #999;">
+                            No attendance logs yet
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            logsBody.innerHTML = logs.slice(0, 20).map((log, index) => {
+                const timeIn = new Date(log.timeIn);
+                const timeOut = log.timeOut ? new Date(log.timeOut) : null;
+                const duration = timeOut ? 
+                    Math.round((timeOut - timeIn) / 60000) + ' min' : 
+                    'In progress';
+                
+                return `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${log.id}</td>
+                        <td>${log.name}</td>
+                        <td>${timeIn.toLocaleString()}</td>
+                        <td>${timeOut ? timeOut.toLocaleString() : '-'}</td>
+                        <td>${duration}</td>
+                        <td class="${log.status === 'IN' ? 'status-in' : 'status-out'}">${log.status}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // Export to Excel
+        function exportToExcel() {
+            if (logs.length === 0) {
+                showNotification('No data to export', true);
+                return;
+            }
+            
+            const worksheet = XLSX.utils.json_to_sheet(logs.map(log => ({
+                ID: log.id,
+                Name: log.name,
+                'Time In': new Date(log.timeIn).toLocaleString(),
+                'Time Out': log.timeOut ? new Date(log.timeOut).toLocaleString() : '-',
+                Status: log.status,
+                Duration: log.timeOut ? 
+                    Math.round((new Date(log.timeOut) - new Date(log.timeIn)) / 60000) + ' min' : 
+                    'In progress'
+            })));
+            
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance Logs");
+            XLSX.writeFile(workbook, "attendance_logs.xlsx");
+            showNotification('Exported to Excel!');
+        }
+        
+        // Export users to Excel
+        function exportUsersExcel() {
+            if (users.length === 0) {
+                showNotification('No users to export', true);
+                return;
+            }
+            
+            const worksheet = XLSX.utils.json_to_sheet(users.map(user => ({
+                ID: user.id,
+                Name: user.name,
+                Status: user.isInLibrary ? 'In Library' : 'Not in Library',
+                'Last Check In': user.lastCheckIn ? new Date(user.lastCheckIn).toLocaleString() : '-',
+                'Last Check Out': user.lastCheckOut ? new Date(user.lastCheckOut).toLocaleString() : '-',
+                Registered: new Date(user.registered).toLocaleString()
+            })));
+            
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Library Users");
+            XLSX.writeFile(workbook, "library_users.xlsx");
+            showNotification('Users exported to Excel!');
+        }
+        
+        // Clear data
+        function clearData() {
+            if (confirm('Are you sure you want to clear all data? This cannot be undone!')) {
+                users = [];
+                logs = [];
+                saveData();
+                updateStats();
+                updateLogsTable();
+                document.getElementById('userInfo').classList.remove('show');
+                document.getElementById('qrcode').innerHTML = '<p style="color: #999;">QR code will appear here</p>';
+                showNotification('All data cleared!');
+            }
+        }
+        
+        // Open user list modal
+        function openUserList() {
+            updateUsersTable();
+            document.getElementById('userListModal').style.display = 'flex';
+        }
+        
+        // Close user list modal
+        function closeUserList() {
+            document.getElementById('userListModal').style.display = 'none';
+        }
+        
+        // Update users table
+        function updateUsersTable(searchTerm = '') {
+            const usersTableBody = document.getElementById('usersTableBody');
+            let filteredUsers = users;
+            
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filteredUsers = users.filter(user => 
+                    user.name.toLowerCase().includes(term) || 
+                    user.id.toLowerCase().includes(term)
+                );
+            }
+            
+            if (filteredUsers.length === 0) {
+                usersTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 20px; color: #999;">
+                            No users found
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            usersTableBody.innerHTML = filteredUsers.map(user => `
+                <tr>
+                    <td>${user.id}</td>
+                    <td>${user.name}</td>
+                    <td class="${user.isInLibrary ? 'status-in' : 'status-out'}">
+                        ${user.isInLibrary ? 'IN' : 'OUT'}
+                    </td>
+                    <td class="action-buttons">
+                        <button class="btn-info" onclick="editUser('${user.id}')">✏️ Edit</button>
+                        <button class="btn-danger" onclick="deleteUserPrompt('${user.id}')">🗑️ Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        // Search users
+        function searchUsers() {
+            const searchTerm = document.getElementById('searchUser').value;
+            updateUsersTable(searchTerm);
+        }
+        
+        // Edit user
+        function editUser(userId) {
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+            
+            currentUserToEdit = user;
+            document.getElementById('editUserName').value = user.name;
+            document.getElementById('editUserId').value = user.id;
+            
+            closeUserList();
+            document.getElementById('editUserModal').style.display = 'flex';
+        }
+        
+        // Close edit user modal
+        function closeEditUser() {
+            document.getElementById('editUserModal').style.display = 'none';
+            currentUserToEdit = null;
+        }
+        
+        // Save user changes
+        function saveUserChanges() {
+            if (!currentUserToEdit) return;
+            
+            const newName = document.getElementById('editUserName').value.trim();
+            if (!newName) {
+                showNotification('Please enter a name', true);
+                return;
+            }
+            
+            // Check if name is already taken by another user
+            const nameExists = users.some(u => 
+                u.id !== currentUserToEdit.id && 
+                u.name.toLowerCase() === newName.toLowerCase()
+            );
+            
+            if (nameExists) {
+                showNotification('Name already exists', true);
+                return;
+            }
+            
+            // Update user
+            const userIndex = users.findIndex(u => u.id === currentUserToEdit.id);
+            users[userIndex].name = newName;
+            
+            // Update logs
+            logs.forEach(log => {
+                if (log.id === currentUserToEdit.id) {
+                    log.name = newName;
+                }
+            });
+            
+            saveData();
+            updateStats();
+            updateLogsTable();
+            closeEditUser();
+            showNotification('User updated successfully!');
+        }
+        
+        // Delete user prompt
+        function deleteUserPrompt(userId) {
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+            
+            if (confirm(`Are you sure you want to delete ${user.name} (${user.id})?`)) {
+                deleteUser(userId);
+            }
+        }
+        
+        // Delete user
+        function deleteUser(userId = null) {
+            const idToDelete = userId || (currentUserToEdit ? currentUserToEdit.id : null);
+            if (!idToDelete) return;
+            
+            // Remove user
+            users = users.filter(u => u.id !== idToDelete);
+            
+            // Remove user's logs
+            logs = logs.filter(log => log.id !== idToDelete);
+            
+            saveData();
+            updateStats();
+            updateLogsTable();
+            updateUsersTable();
+            
+            if (currentUserToEdit) {
+                closeEditUser();
+            }
+            
+            showNotification('User deleted successfully!');
+        }
+        
+        // Manual QR entry (for testing)
+        function manualQRScan() {
+            const qrData = prompt('Enter QR code data (JSON format):');
+            if (!qrData) return;
+            
+            try {
+                const data = JSON.parse(qrData);
+                const user = users.find(u => u.id === data.id && u.name === data.name);
+                
+                if (user) {
+                    processScan(user);
+                } else {
+                    showNotification('User not found!', true);
+                }
+            } catch (e) {
+                showNotification('Invalid QR code data', true);
+            }
+        }
+        
+        // Add manual scan button event listener
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add manual scan button to scanner card
+            const scannerCard = document.querySelector('.card:nth-child(2)');
+            const buttonGroup = scannerCard.querySelector('.button-group');
+            const manualButton = document.createElement('button');
+            manualButton.className = 'btn-info';
+            manualButton.textContent = '📝 Manual Scan';
+            manualButton.onclick = manualQRScan;
+            buttonGroup.appendChild(manualButton);
+        });
+    </script>
+</body>
+</html>
