@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Registration & Attendance System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #2c3e50, #4a6491);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            border-radius: 0 0 15px 15px;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .app-description {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .card-title i {
+            color: #3498db;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #444;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        #generateBtn {
+            background-color: #27ae60;
+        }
+
+        #generateBtn:hover {
+            background-color: #219653;
+        }
+
+        #scanBtn {
+            background-color: #e74c3c;
+        }
+
+        #scanBtn:hover {
+            background-color: #c0392b;
+        }
+
+        .qr-container {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #qrcode {
+            margin: 20px auto;
+        }
+
+        #scannerContainer {
+            width: 100%;
+            height: 300px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #666;
+            border: 2px dashed #ccc;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #scannerContainer video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .scanner-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 1.2rem;
+            z-index: 10;
+        }
+
+        .logs-container {
+            grid-column: 1 / -1;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        .status-in {
+            color: #27ae60;
+            font-weight: 600;
+            background-color: rgba(39, 174, 96, 0.1);
+            padding: 5px 10px;
+            border-radius: 20px;
+        }
+
+        .status-out {
+            color: #e74c3c;
+            font-weight: 600;
+            background-color: rgba(231, 76, 60, 0.1);
+            padding: 5px 10px;
+            border-radius: 20px;
+        }
+
+        .empty-logs {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            margin-top: 2rem;
+            color: #7f8c8d;
+            border-top: 1px solid #eee;
+        }
+
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background-color: #2ecc71;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: none;
+            z-index: 100;
+            max-width: 300px;
+        }
+
+        .notification.error {
+            background-color: #e74c3c;
+        }
+
+        .user-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .user-info.active {
+            display: block;
+        }
+
+        .user-info h4 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><i class="fas fa-book-reader"></i> Library Registration & Attendance System</h1>
+            <p>Register library users with QR codes and track attendance with time in/out scanning</p>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="app-description">
+            <p>This system allows library administrators to register users with a unique ID and generate QR codes for each user. Users can then scan their QR code to record time in and time out from the library.</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Registration Section -->
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-user-plus"></i> User Registration</h2>
+                <div class="form-group">
+                    <label for="name">Full Name</label>
+                    <input type="text" id="name" placeholder="Enter user's full name">
+                </div>
+                <div class="form-group">
+                    <label for="libraryId">Library ID</label>
+                    <input type="text" id="libraryId" placeholder="Enter unique library ID">
+                </div>
+                <button id="generateBtn">
+                    <i class="fas fa-qrcode"></i> Generate Library QR Code
+                </button>
+                
+                <div class="user-info" id="userInfo">
+                    <h4>User Information</h4>
+                    <p><strong>Name:</strong> <span id="infoName"></span></p>
+                    <p><strong>Library ID:</strong> <span id="infoId"></span></p>
+                </div>
+                
+                <div class="qr-container">
+                    <h3>Library ID QR Code</h3>
+                    <p>Scan this code to record time in/out at the library entrance</p>
+                    <div id="qrcode"></div>
+                    <p id="qrInstructions" style="display: none;">Save or print this QR code for library access</p>
+                </div>
+            </div>
+
+            <!-- Scanner Section -->
+            <div class="card">
+                <h2 class="card-title"><i class="fas fa-camera"></i> QR Code Scanner</h2>
+                <div id="scannerContainer">
+                    <div class="scanner-overlay" id="scannerOverlay">
+                        <div>
+                            <i class="fas fa-camera fa-2x"></i>
+                            <p>Click "Start Scanner" to begin scanning QR codes</p>
+                        </div>
+                    </div>
+                    <!-- Video element for scanner will be added here -->
+                </div>
+                <button id="scanBtn">
+                    <i class="fas fa-play"></i> Start Scanner
+                </button>
+                
+                <div class="user-info" id="scannedUserInfo">
+                    <h4>Scanned User</h4>
+                    <p><strong>Name:</strong> <span id="scannedName"></span></p>
+                    <p><strong>Library ID:</strong> <span id="scannedId"></span></p>
+                    <p><strong>Status:</strong> <span id="scannedStatus"></span></p>
+                    <p><strong>Time:</strong> <span id="scannedTime"></span></p>
+                </div>
+            </div>
+
+            <!-- Attendance Logs -->
+            <div class="card logs-container">
+                <h2 class="card-title"><i class="fas fa-history"></i> Attendance Logs</h2>
+                <div id="attendanceLogs">
+                    <table id="logsTable">
+                        <thead>
+                            <tr>
+                                <th>Library ID</th>
+                                <th>Name</th>
+                                <th>Time In</th>
+                                <th>Time Out</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody">
+                            <!-- Logs will be populated here -->
+                        </tbody>
+                    </table>
+                    <div id="emptyLogsMessage" class="empty-logs">
+                        <i class="fas fa-clipboard-list fa-2x"></i>
+                        <p>No attendance logs yet. Scan QR codes to record library attendance.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>Library Registration & Attendance System &copy; 2023 | QR Code Based Solution</p>
+        </div>
+    </footer>
+
+    <div class="notification" id="notification">
+        <span id="notificationText">QR Code generated successfully!</span>
+    </div>
+
+    <script>
+        // Library data and state
+        const libraryUsers = [];
+        const attendanceLogs = [];
+        let scannerActive = false;
+        let currentScanner = null;
+
+        // DOM elements
+        const nameInput = document.getElementById('name');
+        const libraryIdInput = document.getElementById('libraryId');
+        const generateBtn = document.getElementById('generateBtn');
+        const scanBtn = document.getElementById('scanBtn');
+        const qrcodeDiv = document.getElementById('qrcode');
+        const scannerContainer = document.getElementById('scannerContainer');
+        const scannerOverlay = document.getElementById('scannerOverlay');
+        const logsTableBody = document.getElementById('logsTableBody');
+        const emptyLogsMessage = document.getElementById('emptyLogsMessage');
+        const notification = document.getElementById('notification');
+        const notificationText = document.getElementById('notificationText');
+        const userInfo = document.getElementById('userInfo');
+        const infoName = document.getElementById('infoName');
+        const infoId = document.getElementById('infoId');
+        const scannedUserInfo = document.getElementById('scannedUserInfo');
+        const scannedName = document.getElementById('scannedName');
+        const scannedId = document.getElementById('scannedId');
+        const scannedStatus = document.getElementById('scannedStatus');
+        const scannedTime = document.getElementById('scannedTime');
+
+        // Generate QR Code
+        generateBtn.addEventListener('click', generateQRCode);
+        
+        // Toggle QR Scanner
+        scanBtn.addEventListener('click', toggleScanner);
+
+        // Generate QR code function
+        function generateQRCode() {
+            const name = nameInput.value.trim();
+            const libraryId = libraryIdInput.value.trim();
+            
+            if (!name || !libraryId) {
+                showNotification('Please enter both name and library ID', true);
+                return;
+            }
+            
+            // Check if library ID already exists
+            if (libraryUsers.some(user => user.libraryId === libraryId)) {
+                showNotification('Library ID already exists. Please use a different ID.', true);
+                return;
+            }
+            
+            // Create user object
+            const user = {
+                name: name,
+                libraryId: libraryId,
+                isInLibrary: false,
+                lastCheckIn: null,
+                lastCheckOut: null
+            };
+            
+            // Add to users array
+            libraryUsers.push(user);
+            
+            // Create data string for QR code
+            const userData = JSON.stringify({
+                name: name,
+                libraryId: libraryId
+            });
+            
+            // Clear previous QR code
+            qrcodeDiv.innerHTML = '';
+            
+            // Generate new QR code
+            QRCode.toCanvas(qrcodeDiv, userData, {
+                width: 200,
+                height: 200,
+                margin: 1,
+                color: {
+                    dark: '#2c3e50',
+                    light: '#ffffff'
+                }
+            }, function(error) {
+                if (error) {
+                    console.error(error);
+                    showNotification('Error generating QR code', true);
+                } else {
+                    // Show user info
+                    infoName.textContent = name;
+                    infoId.textContent = libraryId;
+                    userInfo.classList.add('active');
+                    
+                    // Show QR instructions
+                    document.getElementById('qrInstructions').style.display = 'block';
+                    
+                    // Clear form
+                    nameInput.value = '';
+                    libraryIdInput.value = '';
+                    
+                    showNotification(`QR Code generated for ${name} (ID: ${libraryId})`);
+                }
+            });
+        }
+
+        // Toggle scanner function
+        function toggleScanner() {
+            if (!scannerActive) {
+                startScanner();
+            } else {
+                stopScanner();
+            }
+        }
+
+        // Start QR scanner
+        function startScanner() {
+            // Check if browser supports camera access
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showNotification('Camera access not supported in your browser', true);
+                return;
+            }
+            
+            // Request camera permission
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(function(stream) {
+                    scannerActive = true;
+                    scanBtn.innerHTML = '<i class="fas fa-stop"></i> Stop Scanner';
+                    scanBtn.style.backgroundColor = '#f39c12';
+                    
+                    // Hide overlay
+                    scannerOverlay.style.display = 'none';
+                    
+                    // Create video element
+                    const video = document.createElement('video');
+                    video.setAttribute('autoplay', '');
+                    video.setAttribute('playsinline', '');
+                    video.srcObject = stream;
+                    scannerContainer.appendChild(video);
+                    
+                    // Create canvas for QR code scanning
+                    const canvas = document.createElement('canvas');
+                    const canvasContext = canvas.getContext('2d');
+                    
+                    // Set canvas dimensions to match video
+                    video.addEventListener('loadedmetadata', function() {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                    });
+                    
+                    // Start scanning loop
+                    currentScanner = setInterval(function() {
+                        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                            // Draw video frame to canvas
+                            canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            
+                            // Get image data from canvas
+                            const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
+                            
+                            // Simple QR code detection (in a real app, you'd use a library like jsQR)
+                            // For this demo, we'll simulate scanning with a button
+                        }
+                    }, 100);
+                    
+                    // For demo purposes, simulate scanning after 3 seconds
+                    setTimeout(simulateScan, 3000);
+                })
+                .catch(function(error) {
+                    console.error('Error accessing camera:', error);
+                    showNotification('Could not access camera. Please check permissions.', true);
+                });
+        }
+
+        // Stop QR scanner
+        function stopScanner() {
+            if (currentScanner) {
+                clearInterval(currentScanner);
+                currentScanner = null;
+            }
+            
+            // Stop all video streams
+            const video = scannerContainer.querySelector('video');
+            if (video) {
+                const stream = video.srcObject;
+                const tracks = stream.getTracks();
+                tracks.forEach(track => track.stop());
+                scannerContainer.removeChild(video);
+            }
+            
+            scannerActive = false;
+  
