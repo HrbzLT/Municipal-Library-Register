@@ -6,6 +6,8 @@
     <title>Library Registration & Attendance System</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <!-- Add jsQR library for real QR scanning -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -159,6 +161,15 @@
             background-color: #c0392b;
         }
 
+        #stopBtn {
+            background-color: #f39c12;
+            display: none;
+        }
+
+        #stopBtn:hover {
+            background-color: #d68910;
+        }
+
         .qr-container {
             text-align: center;
             margin-top: 20px;
@@ -174,6 +185,12 @@
 
         #qrcode {
             margin: 20px auto;
+            max-width: 100%;
+        }
+
+        #qrcode canvas {
+            max-width: 100%;
+            height: auto;
         }
 
         #scannerContainer {
@@ -210,6 +227,38 @@
             color: white;
             font-size: 1.2rem;
             z-index: 10;
+            text-align: center;
+            padding: 20px;
+            flex-direction: column;
+        }
+
+        .scanner-frame {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 70%;
+            border: 3px solid #27ae60;
+            border-radius: 10px;
+            box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.5);
+            z-index: 5;
+            display: none;
+        }
+
+        .scanner-frame.active {
+            display: block;
+        }
+
+        .scanner-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .scanner-buttons button {
+            width: auto;
+            flex: 1;
         }
 
         .logs-container {
@@ -221,12 +270,15 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 10px;
+            overflow-x: auto;
+            display: block;
         }
 
         th, td {
             padding: 15px;
             text-align: left;
             border-bottom: 1px solid #eee;
+            min-width: 120px;
         }
 
         th {
@@ -304,6 +356,35 @@
             margin-bottom: 10px;
             color: #2c3e50;
         }
+
+        .demo-qr-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .demo-qr-buttons button {
+            flex: 1;
+            padding: 10px;
+            font-size: 0.9rem;
+        }
+
+        .mobile-warning {
+            display: none;
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-warning {
+                display: block;
+            }
+        }
     </style>
 </head>
 <body>
@@ -315,6 +396,10 @@
     </header>
 
     <div class="container">
+        <div class="mobile-warning">
+            <i class="fas fa-info-circle"></i> For mobile scanning: Allow camera permissions when prompted
+        </div>
+        
         <div class="app-description">
             <p>This system allows library administrators to register users with a unique ID and generate QR codes for each user. Users can then scan their QR code to record time in and time out from the library.</p>
         </div>
@@ -335,17 +420,29 @@
                     <i class="fas fa-qrcode"></i> Generate Library QR Code
                 </button>
                 
+                <div class="demo-qr-buttons">
+                    <button id="demoUser1" style="background-color: #9b59b6;">
+                        <i class="fas fa-user"></i> Demo User 1
+                    </button>
+                    <button id="demoUser2" style="background-color: #1abc9c;">
+                        <i class="fas fa-user"></i> Demo User 2
+                    </button>
+                </div>
+                
                 <div class="user-info" id="userInfo">
                     <h4>User Information</h4>
                     <p><strong>Name:</strong> <span id="infoName"></span></p>
                     <p><strong>Library ID:</strong> <span id="infoId"></span></p>
+                    <p><strong>QR Code Data:</strong> <span id="qrData"></span></p>
                 </div>
                 
                 <div class="qr-container">
                     <h3>Library ID QR Code</h3>
                     <p>Scan this code to record time in/out at the library entrance</p>
                     <div id="qrcode"></div>
-                    <p id="qrInstructions" style="display: none;">Save or print this QR code for library access</p>
+                    <p id="qrInstructions" style="display: none; margin-top: 10px;">
+                        <i class="fas fa-info-circle"></i> Save or print this QR code for library access
+                    </p>
                 </div>
             </div>
 
@@ -357,13 +454,23 @@
                         <div>
                             <i class="fas fa-camera fa-2x"></i>
                             <p>Click "Start Scanner" to begin scanning QR codes</p>
+                            <p style="font-size: 0.9rem; margin-top: 10px; opacity: 0.9;">
+                                <i class="fas fa-lightbulb"></i> Point camera at a QR code
+                            </p>
                         </div>
                     </div>
+                    <div class="scanner-frame" id="scannerFrame"></div>
                     <!-- Video element for scanner will be added here -->
                 </div>
-                <button id="scanBtn">
-                    <i class="fas fa-play"></i> Start Scanner
-                </button>
+                
+                <div class="scanner-buttons">
+                    <button id="scanBtn">
+                        <i class="fas fa-play"></i> Start Scanner
+                    </button>
+                    <button id="stopBtn">
+                        <i class="fas fa-stop"></i> Stop Scanner
+                    </button>
+                </div>
                 
                 <div class="user-info" id="scannedUserInfo">
                     <h4>Scanned User</h4>
@@ -404,6 +511,9 @@
     <footer>
         <div class="container">
             <p>Library Registration & Attendance System &copy; 2023 | QR Code Based Solution</p>
+            <p style="font-size: 0.9rem; margin-top: 5px;">
+                <i class="fas fa-lightbulb"></i> For mobile: Use HTTPS and allow camera permissions
+            </p>
         </div>
     </footer>
 
@@ -416,16 +526,23 @@
         const libraryUsers = [];
         const attendanceLogs = [];
         let scannerActive = false;
-        let currentScanner = null;
+        let currentStream = null;
+        let scanningInterval = null;
+        let canvas = null;
+        let canvasContext = null;
 
         // DOM elements
         const nameInput = document.getElementById('name');
         const libraryIdInput = document.getElementById('libraryId');
         const generateBtn = document.getElementById('generateBtn');
         const scanBtn = document.getElementById('scanBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const demoUser1Btn = document.getElementById('demoUser1');
+        const demoUser2Btn = document.getElementById('demoUser2');
         const qrcodeDiv = document.getElementById('qrcode');
         const scannerContainer = document.getElementById('scannerContainer');
         const scannerOverlay = document.getElementById('scannerOverlay');
+        const scannerFrame = document.getElementById('scannerFrame');
         const logsTableBody = document.getElementById('logsTableBody');
         const emptyLogsMessage = document.getElementById('emptyLogsMessage');
         const notification = document.getElementById('notification');
@@ -433,17 +550,19 @@
         const userInfo = document.getElementById('userInfo');
         const infoName = document.getElementById('infoName');
         const infoId = document.getElementById('infoId');
+        const qrDataSpan = document.getElementById('qrData');
         const scannedUserInfo = document.getElementById('scannedUserInfo');
         const scannedName = document.getElementById('scannedName');
         const scannedId = document.getElementById('scannedId');
         const scannedStatus = document.getElementById('scannedStatus');
         const scannedTime = document.getElementById('scannedTime');
 
-        // Generate QR Code
+        // Event listeners
         generateBtn.addEventListener('click', generateQRCode);
-        
-        // Toggle QR Scanner
-        scanBtn.addEventListener('click', toggleScanner);
+        scanBtn.addEventListener('click', startScanner);
+        stopBtn.addEventListener('click', stopScanner);
+        demoUser1Btn.addEventListener('click', () => createDemoUser("John Doe", "LIB1001"));
+        demoUser2Btn.addEventListener('click', () => createDemoUser("Jane Smith", "LIB1002"));
 
         // Generate QR code function
         function generateQRCode() {
@@ -476,125 +595,462 @@
             // Create data string for QR code
             const userData = JSON.stringify({
                 name: name,
-                libraryId: libraryId
+                libraryId: libraryId,
+                timestamp: new Date().getTime()
             });
             
             // Clear previous QR code
             qrcodeDiv.innerHTML = '';
             
-            // Generate new QR code
-            QRCode.toCanvas(qrcodeDiv, userData, {
-                width: 200,
-                height: 200,
-                margin: 1,
-                color: {
-                    dark: '#2c3e50',
-                    light: '#ffffff'
-                }
-            }, function(error) {
-                if (error) {
-                    console.error(error);
-                    showNotification('Error generating QR code', true);
-                } else {
-                    // Show user info
-                    infoName.textContent = name;
-                    infoId.textContent = libraryId;
-                    userInfo.classList.add('active');
-                    
-                    // Show QR instructions
-                    document.getElementById('qrInstructions').style.display = 'block';
-                    
-                    // Clear form
-                    nameInput.value = '';
-                    libraryIdInput.value = '';
-                    
-                    showNotification(`QR Code generated for ${name} (ID: ${libraryId})`);
-                }
-            });
-        }
-
-        // Toggle scanner function
-        function toggleScanner() {
-            if (!scannerActive) {
-                startScanner();
-            } else {
-                stopScanner();
+            // Generate new QR code with better error handling
+            try {
+                QRCode.toCanvas(qrcodeDiv, userData, {
+                    width: 200,
+                    height: 200,
+                    margin: 1,
+                    color: {
+                        dark: '#2c3e50',
+                        light: '#ffffff'
+                    }
+                }, function(error) {
+                    if (error) {
+                        console.error('QR Code generation error:', error);
+                        showNotification('Error generating QR code', true);
+                        // Fallback to simple div with text
+                        qrcodeDiv.innerHTML = `
+                            <div style="padding: 20px; background: #f8f9fa; border-radius: 5px;">
+                                <p><strong>QR Code Preview:</strong></p>
+                            </div>
+                        `;
+                    } else {
+                        // Show user info
+                        infoName.textContent = name;
+                        infoId.textContent = libraryId;
+                        qrDataSpan.textContent = userData.substring(0, 50) + '...';
+                        userInfo.classList.add('active');
+                        
+                        // Show QR instructions
+                        document.getElementById('qrInstructions').style.display = 'block';
+                        
+                        // Clear form
+                        nameInput.value = '';
+                        libraryIdInput.value = '';
+                        
+                        showNotification(`QR Code generated for ${name} (ID: ${libraryId})`);
+                        
+                        // Add sample attendance log
+                        setTimeout(() => {
+                            simulateScanForUser(user);
+                        }, 1000);
+                    }
+                });
+            } catch (error) {
+                console.error('QR Code generation exception:', error);
+                showNotification('Error generating QR code. Using text fallback.', true);
+                qrcodeDiv.innerHTML = `
+                    <div style="padding: 20px; background: #f8f9fa; border-radius: 5px; text-align: center;">
+                        <p><strong>Library ID:</strong> ${libraryId}</p>
+                        <p><strong>Name:</strong> ${name}</p>
+                        <p><i class="fas fa-qrcode"></i> QR Code Data:</p>
+                        <p style="font-size: 0.8rem; word-break: break-all;">${userData}</p>
+                    </div>
+                `;
             }
         }
 
+        // Create demo user
+        function createDemoUser(name, libraryId) {
+            nameInput.value = name;
+            libraryIdInput.value = libraryId;
+            generateQRCode();
+        }
+
         // Start QR scanner
-        function startScanner() {
+        async function startScanner() {
+            if (scannerActive) return;
+            
             // Check if browser supports camera access
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 showNotification('Camera access not supported in your browser', true);
                 return;
             }
             
-            // Request camera permission
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                .then(function(stream) {
-                    scannerActive = true;
-                    scanBtn.innerHTML = '<i class="fas fa-stop"></i> Stop Scanner';
-                    scanBtn.style.backgroundColor = '#f39c12';
-                    
-                    // Hide overlay
-                    scannerOverlay.style.display = 'none';
-                    
-                    // Create video element
-                    const video = document.createElement('video');
-                    video.setAttribute('autoplay', '');
-                    video.setAttribute('playsinline', '');
-                    video.srcObject = stream;
-                    scannerContainer.appendChild(video);
-                    
-                    // Create canvas for QR code scanning
-                    const canvas = document.createElement('canvas');
-                    const canvasContext = canvas.getContext('2d');
-                    
-                    // Set canvas dimensions to match video
-                    video.addEventListener('loadedmetadata', function() {
+            try {
+                // Request camera permission
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                });
+                
+                currentStream = stream;
+                scannerActive = true;
+                scanBtn.style.display = 'none';
+                stopBtn.style.display = 'flex';
+                
+                // Hide overlay
+                scannerOverlay.style.display = 'none';
+                scannerFrame.classList.add('active');
+                
+                // Create video element
+                const video = document.createElement('video');
+                video.setAttribute('autoplay', '');
+                video.setAttribute('playsinline', '');
+                video.setAttribute('muted', '');
+                video.srcObject = stream;
+                scannerContainer.appendChild(video);
+                
+                // Create canvas for QR code scanning
+                canvas = document.createElement('canvas');
+                canvasContext = canvas.getContext('2d');
+                
+                // Start scanning loop
+                scanningInterval = setInterval(() => {
+                    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                        // Set canvas dimensions to match video
                         canvas.width = video.videoWidth;
                         canvas.height = video.videoHeight;
-                    });
-                    
-                    // Start scanning loop
-                    currentScanner = setInterval(function() {
-                        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                            // Draw video frame to canvas
-                            canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
-                            
-                            // Get image data from canvas
-                            const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
-                            
-                            // Simple QR code detection (in a real app, you'd use a library like jsQR)
-                            // For this demo, we'll simulate scanning with a button
+                        
+                        // Draw video frame to canvas
+                        canvasContext.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        
+                        // Get image data from canvas
+                        const imageData = canvasContext.getImageData(0, 0, canvas.width, canvas.height);
+                        
+                        // Scan for QR codes using jsQR library
+                        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                            inversionAttempts: "dontInvert",
+                        });
+                        
+                        // If QR code found
+                        if (code) {
+                            processScannedQRCode(code.data);
                         }
-                    }, 100);
+                    }
+                }, 100); // Scan 10 times per second
+                
+                showNotification('Scanner started. Point camera at a QR code.');
+                
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                let errorMessage = 'Could not access camera. ';
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMessage += 'Please allow camera permissions in your browser settings.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage += 'No camera found on this device.';
+                } else if (error.name === 'NotSupportedError') {
+                    errorMessage += 'Camera not supported on this device.';
+                } else {
+                    errorMessage += 'Please check permissions.';
+                }
+                
+                showNotification(errorMessage, true);
+                
+                // For demo purposes, simulate scanning
+                simulateDemoScanning();
+            }
+        }
+
+        // Process scanned QR code
+        function processScannedQRCode(data) {
+            try {
+                // Try to parse as JSON
+                const userData = JSON.parse(data);
+                
+                if (userData.name && userData.libraryId) {
+                    // Find or create user
+                    let user = libraryUsers.find(u => u.libraryId === userData.libraryId);
+                    const now = new Date();
+                    const timeString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    const dateString = now.toLocaleDateString();
                     
-                    // For demo purposes, simulate scanning after 3 seconds
-                    setTimeout(simulateScan, 3000);
-                })
-                .catch(function(error) {
-                    console.error('Error accessing camera:', error);
-                    showNotification('Could not access camera. Please check permissions.', true);
-                });
+                    if (!user) {
+                        // Create new user if not found
+                        user = {
+                            name: userData.name,
+                            libraryId: userData.libraryId,
+                            isInLibrary: false,
+                            lastCheckIn: null,
+                            lastCheckOut: null
+                        };
+                        libraryUsers.push(user);
+                    }
+                    
+                    // Toggle user status (in/out)
+                    user.isInLibrary = !user.isInLibrary;
+                    
+                    if (user.isInLibrary) {
+                        user.lastCheckIn = now;
+                        showNotification(`${user.name} checked IN at ${timeString}`);
+                        scannedStatus.innerHTML = '<span class="status-in">Checked IN</span>';
+                    } else {
+                        user.lastCheckOut = now;
+                        showNotification(`${user.name} checked OUT at ${timeString}`);
+                        scannedStatus.innerHTML = '<span class="status-out">Checked OUT</span>';
+                    }
+                    
+                    // Update scanned user info display
+                    scannedName.textContent = user.name;
+                    scannedId.textContent = user.libraryId;
+                    scannedTime.textContent = `${dateString} ${timeString}`;
+                    scannedUserInfo.classList.add('active');
+                    
+                    // Add to attendance logs
+                    const logEntry = {
+                        libraryId: user.libraryId,
+                        name: user.name,
+                        timeIn: user.isInLibrary ? now : user.lastCheckIn,
+                        timeOut: user.isInLibrary ? null : now,
+                        status: user.isInLibrary ? 'In' : 'Out'
+                    };
+                    
+                    attendanceLogs.unshift(logEntry);
+                    updateAttendanceLogs();
+                    
+                    // Visual feedback
+                    scannerFrame.style.borderColor = user.isInLibrary ? '#27ae60' : '#e74c3c';
+                    setTimeout(() => {
+                        scannerFrame.style.borderColor = '#27ae60';
+                    }, 500);
+                    
+                    return true;
+                }
+            } catch (error) {
+                // If not JSON, check if it's a simple ID
+                console.log('Scanned data (not JSON):', data);
+                
+                // Try to find user by ID in the data
+                const user = libraryUsers.find(u => data.includes(u.libraryId));
+                if (user) {
+                    processScannedQRCode(JSON.stringify({
+                        name: user.name,
+                        libraryId: user.libraryId
+                    }));
+                    return true;
+                }
+            }
+            
+            showNotification('Invalid QR code format', true);
+            return false;
         }
 
         // Stop QR scanner
         function stopScanner() {
-            if (currentScanner) {
-                clearInterval(currentScanner);
-                currentScanner = null;
+            if (scanningInterval) {
+                clearInterval(scanningInterval);
+                scanningInterval = null;
             }
             
-            // Stop all video streams
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+            
+            // Remove video element
             const video = scannerContainer.querySelector('video');
             if (video) {
-                const stream = video.srcObject;
-                const tracks = stream.getTracks();
-                tracks.forEach(track => track.stop());
                 scannerContainer.removeChild(video);
             }
             
             scannerActive = false;
-  
+            scanBtn.style.display = 'flex';
+            stopBtn.style.display = 'none';
+            scannerOverlay.style.display = 'flex';
+            scannerFrame.classList.remove('active');
+            
+            // Hide scanned user info
+            scannedUserInfo.classList.remove('active');
+            
+            showNotification('Scanner stopped');
+        }
+
+        // Simulate scanning for demo (when camera fails)
+        function simulateDemoScanning() {
+            scannerActive = true;
+            scanBtn.style.display = 'none';
+            stopBtn.style.display = 'flex';
+            scannerOverlay.innerHTML = `
+                <div>
+                    <i class="fas fa-mobile-alt fa-2x"></i>
+                    <p>Camera not available</p>
+                    <p style="font-size: 0.9rem; margin-top: 10px;">Demo mode activated</p>
+                    <p style="font-size: 0.8rem; margin-top: 5px;">Scanning demo QR codes...</p>
+                </div>
+            `;
+            scannerOverlay.style.display = 'flex';
+            scannerFrame.classList.add('active');
+            
+            // Simulate scanning every 5 seconds
+            scanningInterval = setInterval(() => {
+                if (libraryUsers.length > 0) {
+                    const randomUser = libraryUsers[Math.floor(Math.random() * libraryUsers.length)];
+                    simulateScanForUser(randomUser);
+                }
+            }, 5000);
+            
+            showNotification('Demo mode activated. Simulating QR scans every 5 seconds.');
+        }
+
+        // Simulate scan for a specific user
+        function simulateScanForUser(user) {
+            if (!user) return;
+            
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const dateString = now.toLocaleDateString();
+            
+            // Toggle user status
+            user.isInLibrary = !user.isInLibrary;
+            
+            if (user.isInLibrary) {
+                user.lastCheckIn = now;
+                showNotification(`${user.name} checked IN at ${timeString}`);
+                scannedStatus.innerHTML = '<span class="status-in">Checked IN</span>';
+            } else {
+                user.lastCheckOut = now;
+                showNotification(`${user.name} checked OUT at ${timeString}`);
+                scannedStatus.innerHTML = '<span class="status-out">Checked OUT</span>';
+            }
+            
+            // Update scanned user info display
+            scannedName.textContent = user.name;
+            scannedId.textContent = user.libraryId;
+            scannedTime.textContent = `${dateString} ${timeString}`;
+            scannedUserInfo.classList.add('active');
+            
+            // Add to attendance logs
+            const logEntry = {
+                libraryId: user.libraryId,
+                name: user.name,
+                timeIn: user.isInLibrary ? now : user.lastCheckIn,
+                timeOut: user.isInLibrary ? null : now,
+                status: user.isInLibrary ? 'In' : 'Out'
+            };
+            
+            attendanceLogs.unshift(logEntry);
+            updateAttendanceLogs();
+            
+            // Visual feedback
+            if (scannerFrame) {
+                scannerFrame.style.borderColor = user.isInLibrary ? '#27ae60' : '#e74c3c';
+                setTimeout(() => {
+                    if (scannerFrame) {
+                        scannerFrame.style.borderColor = '#27ae60';
+                    }
+                }, 500);
+            }
+        }
+
+        // Update attendance logs table
+        function updateAttendanceLogs() {
+            // Clear table body
+            logsTableBody.innerHTML = '';
+            
+            if (attendanceLogs.length === 0) {
+                emptyLogsMessage.style.display = 'block';
+                return;
+            }
+            
+            emptyLogsMessage.style.display = 'none';
+            
+            // Add each log entry to the table
+            attendanceLogs.forEach(log => {
+                const row = document.createElement('tr');
+                
+                const timeIn = log.timeIn ? 
+                    `${log.timeIn.toLocaleDateString()} ${log.timeIn.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 
+                    'N/A';
+                
+                const timeOut = log.timeOut ? 
+                    `${log.timeOut.toLocaleDateString()} ${log.timeOut.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 
+                    'N/A';
+                
+                const status = log.status === 'In' ? 
+                    '<span class="status-in">In Library</span>' : 
+                    '<span class="status-out">Left Library</span>';
+                
+                row.innerHTML = `
+                    <td>${log.libraryId}</td>
+                    <td>${log.name}</td>
+                    <td>${timeIn}</td>
+                    <td>${timeOut}</td>
+                    <td>${status}</td>
+                `;
+                
+                logsTableBody.appendChild(row);
+            });
+        }
+
+        // Show notification
+        function showNotification(message, isError = false) {
+            notificationText.textContent = message;
+            
+            if (isError) {
+                notification.classList.add('error');
+            } else {
+                notification.classList.remove('error');
+            }
+            
+            notification.style.display = 'block';
+            
+            // Hide notification after 3 seconds
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+
+        // Initialize with some sample data for demo
+        function initializeSampleData() {
+            const sampleUsers = [
+                { name: "John Doe", libraryId: "LIB1001" },
+                { name: "Jane Smith", libraryId: "LIB1002" },
+                { name: "Robert Johnson", libraryId: "LIB1003" }
+            ];
+            
+            sampleUsers.forEach(user => {
+                libraryUsers.push({
+                    ...user,
+                    isInLibrary: false,
+                    lastCheckIn: null,
+                    lastCheckOut: null
+                });
+            });
+            
+            // Add a few sample logs
+            const now = new Date();
+            const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+            const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+            
+            attendanceLogs.push(
+                {
+                    libraryId: "LIB1001",
+                    name: "John Doe",
+                    timeIn: twoHoursAgo,
+                    timeOut: oneHourAgo,
+                    status: "Out"
+                },
+                {
+                    libraryId: "LIB1002",
+                    name: "Jane Smith",
+                    timeIn: oneHourAgo,
+                    timeOut: null,
+                    status: "In"
+                }
+            );
+            
+            updateAttendanceLogs();
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSampleData();
+            
+            // Auto-focus name input for better UX
+            nameInput.focus();
+        });
+    </script>
+</body>
+</html>
